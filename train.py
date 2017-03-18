@@ -11,6 +11,9 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.svm import LinearSVC
 import matplotlib.pyplot as plt
 
+from helper_functions import *
+from hyperparameters import *
+
 class DataSet(object):
 
     def __init__(self):
@@ -127,7 +130,7 @@ gtiLeftVehicles = ImageFolderDataSet("vehicles/GTI_Left/*", 1, time_series=True)
 gtiMiddleCloseVehicles = ImageFolderDataSet("vehicles/GTI_MiddleClose/*", 1, time_series=True)
 gtiRightVehicles = ImageFolderDataSet("vehicles/GTI_Right/*", 1, time_series=True)
 kittiVehicles = ImageFolderDataSet("vehicles/KITTI_extracted/*", 1)
-objectDetection = ImageFileDataSet("object-detection-crowdai/", max_size=14200)
+#objectDetection = ImageFileDataSet("object-detection-crowdai/", max_size=14200)
 
 shuffler = DataSetShuffler()
 data_sets = [
@@ -138,7 +141,7 @@ data_sets = [
                  gtiMiddleCloseVehicles,
                  gtiRightVehicles,
                  kittiVehicles,
-                 objectDetection
+ #                objectDetection
             ]
 img_train, img_test, label_train, label_test = shuffler.shuffle(data_sets)
 
@@ -165,66 +168,6 @@ draw_image(ax9, img_train[indexes[8]], label_train[indexes[8]])
 f.savefig('output_images/preprocessing.png')
 plt.close(f)
 
-def get_hog_features(img, orient, pix_per_cell, cell_per_block, 
-                        vis=False, feature_vec=True):
-    # Call image output if vis==True
-    if vis == True:
-        features, hog_image = hog(img, orientations=orient, pixels_per_cell=(pix_per_cell, pix_per_cell),
-                                  cells_per_block=(cell_per_block, cell_per_block), transform_sqrt=True,
-                                  visualise=vis, feature_vector=feature_vec)
-        return hog_image
-    # Otherwise call with features output
-    else:      
-        features = hog(img, orientations=orient, pixels_per_cell=(pix_per_cell, pix_per_cell),
-                       cells_per_block=(cell_per_block, cell_per_block), transform_sqrt=True,
-                       visualise=vis, feature_vector=feature_vec)
-        return features
-
-# apply color conversion if other than 'RGB'
-def convert_image(image, cspace='RGB'):
-    if cspace != 'RGB':
-        if cspace == 'HSV':
-            feature_image = cv2.cvtColor(image, cv2.COLOR_RGB2HSV)
-        elif cspace == 'LUV':
-            feature_image = cv2.cvtColor(image, cv2.COLOR_RGB2LUV)
-        elif cspace == 'HLS':
-            feature_image = cv2.cvtColor(image, cv2.COLOR_RGB2HLS)
-        elif cspace == 'YUV':
-            feature_image = cv2.cvtColor(image, cv2.COLOR_RGB2YUV)
-        elif cspace == 'YCrCb':
-            feature_image = cv2.cvtColor(image, cv2.COLOR_RGB2YCrCb)
-    else: feature_image = np.copy(image)
-    return feature_image
-    
-def extract_features(images, cspace='RGB', orient=9, 
-                        pix_per_cell=8, cell_per_block=2, hog_channel=0):
-    # Create a list to append feature vectors to
-    features = []
-    # Iterate through the list of images
-    for image in images:
-        feature_image = convert_image(image, cspace)     
-
-        # Call get_hog_features() with vis=False, feature_vec=True
-        if hog_channel == 'ALL':
-            hog_features = []
-            for channel in range(feature_image.shape[2]):
-                hog_features.append(get_hog_features(feature_image[:,:,channel], 
-                                    orient, pix_per_cell, cell_per_block, 
-                                    vis=False, feature_vec=True))
-            hog_features = np.ravel(hog_features)        
-        else:
-            hog_features = get_hog_features(feature_image[:,:,hog_channel], orient, 
-                        pix_per_cell, cell_per_block, vis=False, feature_vec=True)
-        # Append the new feature vector to the features list
-        features.append(hog_features)
-    # Return list of feature vectors
-    return features
-
-cspace='RGB'
-orient = 9
-pix_per_cell = 8
-cell_per_block = 2
-hog_channel = 0
 
 f, ((ax1, ax2, ax3), (ax4, ax5, ax6), (ax7, ax8, ax9)) = plt.subplots(3, 3, figsize=(24,9))
 f.tight_layout()
@@ -241,13 +184,17 @@ f.savefig('output_images/hog.png')
 plt.close(f)
 
 # Extract the HOG features
-features_train = extract_features(img_train, cspace=cspace, orient=orient, 
+features_train = extract_features(img_train, cspace=cspace, spatial_size=spatial_size,
+                        nbins=nbins, bins_range=bins_range, orient=orient, 
                         pix_per_cell=pix_per_cell, cell_per_block=cell_per_block, 
-                        hog_channel=hog_channel)
+                        hog_channel=hog_channel, canny_low_threshold=canny_low_threshold,
+                        canny_high_threshold=canny_high_threshold)
 
-features_test = extract_features(img_test, cspace=cspace, orient=orient, 
+features_test = extract_features(img_test, cspace=cspace, spatial_size=spatial_size,
+                        nbins=nbins, bins_range=bins_range, orient=orient, 
                         pix_per_cell=pix_per_cell, cell_per_block=cell_per_block, 
-                        hog_channel=hog_channel)
+                        hog_channel=hog_channel, canny_low_threshold=canny_low_threshold,
+                        canny_high_threshold=canny_high_threshold)
 
 X = np.vstack((features_train, features_test)).astype(np.float64)
 
@@ -272,8 +219,7 @@ svc.fit(scaled_X_train, label_train)
 
 print('Test Accuracy of SVC = ', round(svc.score(scaled_X_test, label_test), 4))
 
-with open('vehicle_fit.p', 'wb') as handle:
-    pickle.dump(svc, handle, protocol=pickle.HIGHEST_PROTOCOL)
+data = {'svc':svc, 'scaler':X_scaler}
 
-#with open('vehicle_fit.p', 'rb') as handle:
-#    svc = pickle.load(handle)
+with open('vehicle_fit.p', 'wb') as handle:
+    pickle.dump(data, handle, protocol=pickle.HIGHEST_PROTOCOL)

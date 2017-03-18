@@ -1,0 +1,14 @@
+cspace='HSV'
+spatial_size=(16,16)
+nbins=32
+bins_range=(0,256)
+orient = 9
+pix_per_cell = 8
+cell_per_block = 2
+hog_channel = 0
+canny_low_threshold=1
+canny_high_threshold=10
+y_start_stop = [400, 700] # Min and max in y to search in slide_window()
+x_start_stop = [600, None] # Min and max in x to search in slide_window()
+heat_threshold = 40
+heat_queue_depth = 20
