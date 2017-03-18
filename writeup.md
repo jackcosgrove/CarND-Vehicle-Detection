@@ -1,5 +1,3 @@
-##Writeup Template
-###You can use this file as a template for your writeup if you want to submit it as a markdown file, but feel free to use some other method and submit a pdf if you prefer.
 
 ---
 
@@ -69,40 +67,30 @@ I trained a linear SVM using the default parameters, after normalizing the train
 
 ####1. Describe how (and identify where in your code) you implemented a sliding window search.  How did you decide what scales to search and how much to overlap windows?
 
-I decided to search random window positions at random scales all over the image and came up with this (ok just kidding I didn't actually ;):
+I used the sliding scale implementation from the lesson, found in function `slide_window()` at line 124 in `helper_functions.py`. I found a `xy_window=(64, 64)` worked well to both identify smaller vehicles in the video which were missed by a larger window as well as avoid too many false positives which were detected by a smaller window. I set `xy_overlap=(0.75, 0.75)` to generate more hits over detected vehicles, enabling me to raise the heatmap threshold to screen out more false positives.
 
-![alt text][image3]
+I also clipped the search area of the videos. Vertically, I set `y_start_stop = [400, 700]` to exclude areas above the horizon as well as below the dashboard. Horizontally I set `x_start_stop = [600, None]` to exclude areas to the left of the center of the driving lane, since the car remained in the left lane throughout the video. Ideally I would detect if I was in the right or left lane and dynamically exclude either the left and right shoulders from scanning, but this was unnecessary given the evaluation video.
 
 ####2. Show some examples of test images to demonstrate how your pipeline is working.  What did you do to optimize the performance of your classifier?
 
-Ultimately I searched on two scales using YCrCb 3-channel HOG features plus spatially binned color and histograms of color in the feature vector, which provided a nice result.  Here are some example images:
+Ultimately I searched on one scales using HSV hue channel HOG features plus spatially binned color, histograms of color, and Canny edge detection in the feature vector, which provided a nice result.  Here is an example image:
 
-![alt text][image4]
+![alt text][image3]
 ---
 
 ### Video Implementation
 
 ####1. Provide a link to your final video output.  Your pipeline should perform reasonably well on the entire project video (somewhat wobbly or unstable bounding boxes are ok as long as you are identifying the vehicles most of the time with minimal false positives.)
-Here's a [link to my video result](./project_video.mp4)
+Here's a [link to my video result](./project_video_output.mp4)
 
 
 ####2. Describe how (and identify where in your code) you implemented some kind of filter for false positives and some method for combining overlapping bounding boxes.
 
-I recorded the positions of positive detections in each frame of the video.  From the positive detections I created a heatmap and then thresholded that map to identify vehicle positions.  I then used `scipy.ndimage.measurements.label()` to identify individual blobs in the heatmap.  I then assumed each blob corresponded to a vehicle.  I constructed bounding boxes to cover the area of each blob detected.  
+I recorded the positions of positive detections in each frame of the video.  From the positive detections I created a heatmap. I also kept a queue of 20 of the most recent heatmaps and added them all together before  thresholding that composite map to identify vehicle positions.  I then used `scipy.ndimage.measurements.label()` to identify individual blobs in the heatmap.  I assumed each blob corresponded to a vehicle.  I constructed bounding boxes to cover the area of each blob detected.  
 
-Here's an example result showing the heatmap from a series of frames of video, the result of `scipy.ndimage.measurements.label()` and the bounding boxes then overlaid on the last frame of video:
+Here's an example result showing the heatmap from the video frame above:
 
-### Here are six frames and their corresponding heatmaps:
-
-![alt text][image5]
-
-### Here is the output of `scipy.ndimage.measurements.label()` on the integrated heatmap from all six frames:
-![alt text][image6]
-
-### Here the resulting bounding boxes are drawn onto the last frame in the series:
-![alt text][image7]
-
-
+![alt text][image4]
 
 ---
 
@@ -110,5 +98,9 @@ Here's an example result showing the heatmap from a series of frames of video, t
 
 ####1. Briefly discuss any problems / issues you faced in your implementation of this project.  Where will your pipeline likely fail?  What could you do to make it more robust?
 
-Here I'll talk about the approach I took, what techniques I used, what worked and why, where the pipeline might fail and how I might improve it if I were going to pursue this project further.  
+The biggest problem I faced was detecting the black vehicle. I solved this by using the hue channel of the HSV colorspace rather than the red channel of the RGB colorspace. The next biggest problem was false positives. I solved this by queuing up heatmaps and thresholding the queue rather than each individual heatmap, and excluding the left shoulder from scanning.
+
+Problems that remain include an inability to detect vehicles once they get too far ahead of the camera. I could implement a second search window scale with a smaller search window above a certain point in the image. I also had problems with the same vehicle being detected as multiple blobs. This might be solved by relaxing my composite heatmap threshold.
+
+My pipeline would fail if the vehicle also ever switched lanes out of the left lane, since the left third of the screen is not scanned. This could be solved by dynamically detecting road shoulders and setting the boundaries of the scan area with that information.
 
