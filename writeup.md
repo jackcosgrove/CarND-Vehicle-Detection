@@ -15,14 +15,11 @@ The goals / steps of this project are the following:
 * Estimate a bounding box for vehicles detected.
 
 [//]: # (Image References)
-[image1]: ./examples/car_not_car.png
-[image2]: ./examples/HOG_example.jpg
-[image3]: ./examples/sliding_windows.jpg
-[image4]: ./examples/sliding_window.jpg
-[image5]: ./examples/bboxes_and_heat.png
-[image6]: ./examples/labels_map.png
-[image7]: ./examples/output_bboxes.png
-[video1]: ./project_video.mp4
+[image1]: ./output_images/preprocessing.png
+[image2]: ./output_images/hog.jpg
+[image3]: ./output_images/sample_boxes_1000.png
+[image4]: ./output_images/sample_heatmap_1000.png
+[video1]: ./project_video_output.mp4
 
 ## [Rubric](https://review.udacity.com/#!/rubrics/513/view) Points
 ###Here I will consider the rubric points individually and describe how I addressed each point in my implementation.  
@@ -38,26 +35,35 @@ You're reading it!
 
 ####1. Explain how (and identify where in your code) you extracted HOG features from the training images.
 
-The code for this step is contained in the first code cell of the IPython notebook (or in lines # through # of the file called `some_file.py`).  
+I first created a class `ImageFolderDataSet` (line 58 in `train.py`) to extract and label the training and test set images. Since some of the image sets were time series data, I could not simply shuffle all images after concatenating them into a single set. Instead if the `time_series` parameter was set to true, I first divided the entire set into `n` groups, where `n=1/test_size` where `test_size` is the fraction of the set reserved for the test set in decimal form. So a `test_size=0.2` would result in 5 groups. I then used a `sklearn.model_selection.LeaveOneGroupOut` splitter class to randomly reserve one of these groups as the test set. This meant there were at most a few sequential images spanning the training and test sets if the training/test boundaries occurred within image sequences. Had I shuffled all images before splitting, there may have been many more sequential images in both sets. Visual inspection of the GTI time series data showed that image sequences were 3-5 images long.
 
-I started by reading in all the `vehicle` and `non-vehicle` images.  Here is an example of one of each of the `vehicle` and `non-vehicle` classes:
+I also created a class `ImageFileDataSet` to read in images from the Udacity data set. For this reason, I had to split each `DataSet` into training and test sets separately, and then concatenate and shuffle all of these split sets into a single training and test set using the `DataSetShuffler` class. This was not ideal as it loaded all images into memory at once, rather than shuffle references to images and load images during the classifier fit process. However I did not hit the limit of my hardware.
+
+Unfortunately the inclusion of the Udacity data set yielded worse test set accuracy (around 91%) as well as worse performance on the test video. There were too many false positives. I think this is due to the fact that the labeled data in the Udacity data set often has non-square aspect ratios.
+
+After assembling the training and test sets, I extracted features from both. Feautre extraction occurred at in the function `extract_features()` at line 90 of the file `helper_functions.py`. This function was invoked at lines 187 and 193 of `train.py`. 
+
+Feature extraction used four sets of features: binned spatial feautures, color channel histgrams, binned edge detections through the Canny filter, and histogram of gradient (HOG) feautres. I found that the inclusion of the binned spatial feaures and the color channel histograms improved performance, while the Canny edge detction had little discernible effect. I left the Canny edge detection in the classifier it did not seem to hurt performance either.
+
+The code for HOG feauture extraction is contained in the function `get_hog_features()` beginning at line 28 of the file `helper_functions.py`.  
+
+I started by reading in all the `vehicle` and `non-vehicle` images.  Here are nine labeled examples of the `vehicle` and `non-vehicle` classes:
 
 ![alt text][image1]
 
-I then explored different color spaces and different `skimage.hog()` parameters (`orientations`, `pixels_per_cell`, and `cells_per_block`).  I grabbed random images from each of the two classes and displayed them to get a feel for what the `skimage.hog()` output looks like.
-
-Here is an example using the `YCrCb` color space and HOG parameters of `orientations=8`, `pixels_per_cell=(8, 8)` and `cells_per_block=(2, 2)`:
-
+Here are the HOG images from the nine examples above using the hue channel of the `HSV` color space and HOG parameters of `orientations=9`, `pixels_per_cell=(8, 8)` and `cells_per_block=(2, 2)`:
 
 ![alt text][image2]
 
 ####2. Explain how you settled on your final choice of HOG parameters.
 
-I tried various combinations of parameters and...
+I tuned my classifier with different HOG parameters on a subset of the training data. Initially I was using the RGB colorspace and red channel as it yielded the highest test set accuracy, but that would change later on to using the HSV colorspace and hue channel. Curiously, the HSV colorspace yielded a worse test set accuracy than the RGB colorspace (about 95% vs. 97%) but in the final video the HSV-trained classifier was better able to identify both vehicles.
+
+I tried various combinations of parameters and given the training image size of `(64, 64)` pixels, a `pixels_per_cell=(8, 8)` and `cells_per_block=(2, 2)` parameters worked well. I found the accuracy of the classifier was insensitive to the `orientations` parameter, so I left its value at `9`. I also found that the hue channel yielded the best test set accuracy.
 
 ####3. Describe how (and identify where in your code) you trained a classifier using your selected HOG features (and color features if you used them).
 
-I trained a linear SVM using...
+I trained a linear SVM using the default parameters, after normalizing the training and test set features using a single scaler. This normalization occurred in lines 201-207 of `train.py`. The training of the SVM occurred in lines 215-218 of `train.py`. The training set included 14210 samples, with a test set split size of `0.2`. Within this training set, there were 7036 labeled vehicles, so the training set was balanced. The feature vector length was 2884, and the test set accuracy was 0.9546.
 
 ###Sliding Window Search
 
